@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Food Classifier</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --charcoal:   #1B1815;
+    --charcoal-2: #242019;
+    --ivory:      #F6F1E4;
+    --ink:        #17140F;
+    --chili:      #C1402C;
+    --chili-dark: #9B3122;
+    --turmeric:   #D69A1F;
+    --stone:      #948A7B;
+    --line:       rgba(255,255,255,0.09);
+  }
+
+  * { box-sizing: border-box; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+
+  body {
+    margin: 0;
+    padding: 48px 20px 80px;
+    background: var(--charcoal);
+    background-image:
+      radial-gradient(circle at 15% 0%, var(--charcoal-2) 0%, transparent 45%),
+      radial-gradient(circle at 85% 15%, var(--charcoal-2) 0%, transparent 40%);
+    color: var(--ivory);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+  }
+
+  .page { width: 100%; max-width: 440px; }
+
+  /* ---------- Header ---------- */
+  .eyebrow {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--turmeric);
+    margin: 0 0 10px;
+  }
+
+  h1 {
+    font-family: "Helvetica Neue Condensed", "Arial Narrow", "Liberation Sans Narrow", sans-serif;
+    font-weight: 800;
+    font-stretch: condensed;
+    font-size: 2.5rem;
+    line-height: 0.95;
+    letter-spacing: -0.01em;
+    margin: 0 0 12px;
+    color: var(--ivory);
+  }
+
+  .lede {
+    color: var(--stone);
+    font-size: 0.95rem;
+    line-height: 1.45;
+    margin: 0 0 28px;
+    max-width: 34ch;
+  }
+
+  /* ---------- Upload area ---------- */
+  #dropzone {
+    border: 2px dashed rgba(214, 154, 31, 0.55);
+    border-radius: 6px;
+    padding: 36px 20px;
+    text-align: center;
+    cursor: pointer;
+    color: var(--stone);
+    font-size: 0.9rem;
+    background: rgba(255,255,255,0.02);
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  #dropzone:hover,
+  #dropzone.hover {
+    border-color: var(--turmeric);
+    background: rgba(214, 154, 31, 0.06);
+    color: var(--ivory);
+  }
+  #dropzone:focus-visible {
+    outline: 2px solid var(--turmeric);
+    outline-offset: 3px;
+  }
+
+  #preview {
+    max-width: 100%;
+    margin-top: 16px;
+    border-radius: 6px;
+    display: none;
+    border: 1px solid var(--line);
+  }
+
+  button#submitBtn {
+    display: block;
+    width: 100%;
+    margin-top: 18px;
+    padding: 13px 18px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--ivory);
+    background: var(--chili);
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.05s ease;
+  }
+  button#submitBtn:hover:not(:disabled) { background: var(--chili-dark); }
+  button#submitBtn:active:not(:disabled) { transform: scale(0.99); }
+  button#submitBtn:disabled { background: #4A443B; color: var(--stone); cursor: not-allowed; }
+  button#submitBtn:focus-visible { outline: 2px solid var(--turmeric); outline-offset: 3px; }
+
+  #error {
+    color: #E8756A;
+    margin-top: 14px;
+    font-size: 0.9rem;
+    min-height: 0;
+  }
+
+  /* ---------- Signature element: the "facts" label ---------- */
+  #result { margin-top: 28px; }
+
+  .label {
+    background: var(--ivory);
+    color: var(--ink);
+    border: 3px solid var(--ink);
+    border-radius: 2px;
+    padding: 18px 20px 16px;
+    font-family: Georgia, "Times New Roman", serif;
+  }
+
+  .label-title {
+    font-family: "Helvetica Neue Condensed", "Arial Narrow", "Liberation Sans Narrow", sans-serif;
+    font-weight: 800;
+    font-stretch: condensed;
+    font-size: 1.9rem;
+    letter-spacing: -0.01em;
+    margin: 0 0 2px;
+  }
+
+  .label-sub {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 0.72rem;
+    color: #4a463f;
+    margin: 0 0 8px;
+  }
+
+  .rule-thick { border: none; border-top: 8px solid var(--ink); margin: 6px 0; }
+  .rule-thin  { border: none; border-top: 1px solid var(--ink); margin: 7px 0; }
+  .rule-mid   { border: none; border-top: 4px solid var(--ink); margin: 6px 0; }
+
+  .identified-eyebrow {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+    margin: 6px 0 0;
+  }
+
+  .identified-name {
+    font-family: "Helvetica Neue Condensed", "Arial Narrow", "Liberation Sans Narrow", sans-serif;
+    font-weight: 800;
+    font-stretch: condensed;
+    font-size: 2.6rem;
+    line-height: 1.02;
+    color: var(--chili);
+    margin: 0 0 4px;
+    text-transform: capitalize;
+    word-break: break-word;
+  }
+
+  .fact-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 0.95rem;
+    padding: 3px 0;
+  }
+  .fact-row.bold { font-weight: 700; }
+  .fact-row.indent { padding-left: 16px; font-size: 0.88rem; color: #3a362f; }
+  .fact-row .val { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .fact-row.indent .val { font-weight: 600; }
+
+  .section-heading {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+    margin: 8px 0 2px;
+  }
+
+  .footnote {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 0.7rem;
+    line-height: 1.4;
+    color: #57524a;
+    margin: 8px 0 0;
+    font-style: italic;
+  }
+
+  .no-nutrition {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 0.8rem;
+    color: #57524a;
+    font-style: italic;
+    margin: 4px 0 0;
+  }
+
+  footer {
+    margin-top: 40px;
+    color: var(--stone);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.03em;
+  }
+
+  @media (max-width: 400px) {
+    h1 { font-size: 2.1rem; }
+    .identified-name { font-size: 2.2rem; }
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <p class="eyebrow">6-Class ResNet50 &middot; CPU Inference</p>
+    <h1>Food Image<br>Classifier</h1>
+    <p class="lede">Upload a photo of a meal. The model identifies it and looks up nutrition per serving.</p>
+
+    <div id="dropzone" tabindex="0" role="button" aria-label="Choose an image to classify">
+      Click to choose an image, or drag one here
+    </div>
+    <input type="file" id="fileInput" accept="image/*" style="display:none">
+    <img id="preview" alt="Selected food preview">
+    <button id="submitBtn" disabled>Classify</button>
+
+    <div id="error" role="alert"></div>
+    <div id="result"></div>
+
+    <footer>french_fries &middot; hamburger &middot; pancakes &middot; pizza &middot; sushi &middot; tiramisu</footer>
+  </div>
+
+  <script>
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');
+    const preview = document.getElementById('preview');
+    const submitBtn = document.getElementById('submitBtn');
+    const resultDiv = document.getElementById('result');
+    const errorDiv = document.getElementById('error');
+    let selectedFile = null;
+
+    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+    });
+    dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('hover'); });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('hover'));
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('hover');
+      if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length) handleFile(e.target.files[0]);
+    });
+
+    function handleFile(file) {
+      selectedFile = file;
+      preview.src = URL.createObjectURL(file);
+      preview.style.display = 'block';
+      submitBtn.disabled = false;
+      resultDiv.innerHTML = '';
+      errorDiv.textContent = '';
+    }
+
+    function pct(x) {
+      return (x * 100).toFixed(1) + '%';
+    }
+
+    function titleCase(label) {
+      return label.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+
+    function renderLabel(data) {
+      const top = data.top_prediction;
+      const runnersUp = data.top_5.slice(1);
+      const nutrition = data.nutrition;
+
+      let runnersHtml = runnersUp.map((p) => `
+        <div class="fact-row indent">
+          <span>${titleCase(p.label)}</span>
+          <span class="val">${pct(p.confidence)}</span>
+        </div>
+      `).join('');
+
+      let nutritionHtml;
+      if (nutrition) {
+        nutritionHtml = `
+          <hr class="rule-mid">
+          <p class="section-heading">Nutrition, per serving</p>
+          <div class="fact-row">
+            <span>Serving Size</span>
+            <span class="val">${nutrition.serving}</span>
+          </div>
+          <hr class="rule-thin">
+          <div class="fact-row bold">
+            <span>Calories</span>
+            <span class="val">${nutrition.calories}</span>
+          </div>
+          <hr class="rule-thin">
+          <div class="fact-row">
+            <span>Protein</span>
+            <span class="val">${nutrition.protein_g} g</span>
+          </div>
+          <div class="fact-row">
+            <span>Carbohydrates</span>
+            <span class="val">${nutrition.carbs_g} g</span>
+          </div>
+          <div class="fact-row">
+            <span>Fat</span>
+            <span class="val">${nutrition.fat_g} g</span>
+          </div>
+          <hr class="rule-mid">
+          <p class="footnote">*Confidence reflects model output, not an FDA Daily Value. Nutrition figures are estimates for course demonstration, not verified lab data.</p>
+        `;
+      } else {
+        nutritionHtml = `
+          <hr class="rule-mid">
+          <p class="no-nutrition">No nutrition data on file for this class.</p>
+        `;
+      }
+
+      resultDiv.innerHTML = `
+        <div class="label">
+          <p class="label-title">Classification Facts</p>
+          <p class="label-sub">1 photo analyzed</p>
+          <hr class="rule-thick">
+          <p class="identified-eyebrow">Identified as</p>
+          <p class="identified-name">${titleCase(top.label)}</p>
+          <hr class="rule-mid">
+          <div class="fact-row bold">
+            <span>Confidence</span>
+            <span class="val">${pct(top.confidence)}</span>
+          </div>
+          <hr class="rule-thin">
+          ${runnersHtml}
+          ${nutritionHtml}
+        </div>
+      `;
+    }
+
+    submitBtn.addEventListener('click', async () => {
+      if (!selectedFile) return;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Classifying…';
+      errorDiv.textContent = '';
+      resultDiv.innerHTML = '';
+
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      try {
+        const res = await fetch('/predict', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (!res.ok) {
+          errorDiv.textContent = data.error || 'Something went wrong.';
+        } else {
+          renderLabel(data);
+        }
+      } catch (err) {
+        errorDiv.textContent = 'Request failed: ' + err;
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Classify';
+      }
+    });
+  </script>
+</body>
+</html>

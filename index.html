@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ByteBite — Food Scanner</title>
+<style>
+  /* ---------------------------------------------------------------------
+     Design tokens
+     All fonts are system stacks on purpose: the spec requires the whole
+     system to run fully offline (REQ-012), so nothing here reaches out
+     to a font CDN.
+  --------------------------------------------------------------------- */
+  :root {
+    --ink: #1E1B18;
+    --paper: #FAF6EC;
+    --paper-dim: #F1EBDB;
+    --line: #C9C2B4;
+    --chili: #D64933;
+    --turmeric: #E7A94C;
+    --muted: #8B8578;
+    --error: #B3261E;
+
+    --font-display: "Helvetica Neue Condensed Bold", "Arial Narrow", "Segoe UI Semibold", sans-serif;
+    --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Courier New", monospace;
+
+    --radius: 2px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    min-height: 100%;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--font-body);
+  }
+
+  body {
+    display: flex;
+    justify-content: center;
+    padding: 48px 20px 80px;
+  }
+
+  .app {
+    width: 100%;
+    max-width: 980px;
+  }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(250, 246, 236, 0.18);
+    padding-bottom: 20px;
+    margin-bottom: 36px;
+  }
+
+  .brand {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--turmeric);
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: clamp(28px, 4vw, 40px);
+    letter-spacing: 0.01em;
+    margin: 6px 0 0;
+    color: var(--paper);
+  }
+
+  .tagline {
+    font-size: 13px;
+    color: var(--muted);
+    max-width: 220px;
+    text-align: right;
+    line-height: 1.5;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+    align-items: start;
+  }
+
+  @media (max-width: 760px) {
+    .layout { grid-template-columns: 1fr; }
+    .tagline { display: none; }
+  }
+
+  .scanner {
+    background: rgba(250, 246, 236, 0.04);
+    border: 1px dashed rgba(250, 246, 236, 0.35);
+    border-radius: var(--radius);
+    padding: 28px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+    min-height: 360px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+  }
+
+  .scanner:hover,
+  .scanner.hover {
+    border-color: var(--turmeric);
+    background: rgba(231, 169, 76, 0.06);
+  }
+
+  .scanner:focus-visible {
+    outline: 2px solid var(--turmeric);
+    outline-offset: 3px;
+  }
+
+  .scanner-icon { font-size: 34px; opacity: 0.8; }
+
+  .scanner-label {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .scanner-sub { font-size: 13px; color: var(--muted); }
+
+  .preview-wrap {
+    width: 100%;
+    display: none;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .preview-wrap img {
+    width: 100%;
+    max-height: 260px;
+    object-fit: cover;
+    border-radius: var(--radius);
+    display: block;
+  }
+
+  .btn {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    background: var(--chili);
+    color: var(--paper);
+    border: none;
+    border-radius: var(--radius);
+    padding: 12px 20px;
+    cursor: pointer;
+    transition: transform 0.1s ease, opacity 0.15s ease;
+  }
+
+  .btn:hover { opacity: 0.92; }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  .btn:focus-visible { outline: 2px solid var(--turmeric); outline-offset: 2px; }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid rgba(250, 246, 236, 0.25);
+  }
+
+  input[type="file"] { display: none; }
+
+  .result-slot {
+    min-height: 360px;
+    display: flex;
+    align-items: stretch;
+  }
+
+  .empty-state {
+    margin: auto;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+    max-width: 240px;
+    line-height: 1.6;
+  }
+
+  .empty-state .glyph {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(250, 246, 236, 0.3);
+    display: block;
+    margin-bottom: 10px;
+  }
+
+  .label-card {
+    width: 100%;
+    background: var(--paper);
+    color: var(--ink);
+    border: 3px solid var(--ink);
+    border-radius: var(--radius);
+    padding: 20px 22px 22px;
+    transform-origin: top center;
+    animation: print-out 420ms ease both;
+  }
+
+  @keyframes print-out {
+    from { opacity: 0; transform: scaleY(0.85) translateY(-8px); }
+    to   { opacity: 1; transform: scaleY(1) translateY(0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .label-card { animation: none; }
+  }
+
+  .label-title {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 26px;
+    letter-spacing: 0.01em;
+    margin: 0;
+    text-transform: uppercase;
+  }
+
+  .label-sub {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .rule-thick { height: 6px; background: var(--ink); margin: 12px 0 10px; }
+  .rule-thin  { height: 1px; background: var(--line); margin: 10px 0; }
+
+  .match-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+  }
+
+  .match-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .match-value {
+    font-family: var(--font-mono);
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .bar-track {
+    width: 100%;
+    height: 8px;
+    background: var(--paper-dim);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 4px;
+  }
+
+  .bar-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--chili);
+    border-radius: 4px;
+    transition: width 600ms ease 100ms;
+  }
+
+  .alt-list { margin-top: 4px; }
+
+  .alt-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    padding: 5px 0;
+  }
+
+  .alt-row .name { flex: 1; text-transform: capitalize; }
+  .alt-row .pct { font-family: var(--font-mono); font-size: 12px; color: var(--muted); width: 42px; text-align: right; }
+  .alt-row .bar-track { flex: 1; height: 5px; margin: 0; }
+  .alt-row .bar-fill { background: var(--turmeric); }
+
+  .nutrition-title {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 18px;
+    text-transform: uppercase;
+    margin: 4px 0 0;
+  }
+
+  .serving-line { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+
+  .calorie-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 6px 0;
+  }
+
+  .calorie-row .name { font-weight: 700; font-size: 15px; }
+  .calorie-row .value { font-family: var(--font-mono); font-size: 28px; font-weight: 800; }
+
+  .macro-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .macro-cell { background: var(--paper-dim); border-radius: var(--radius); padding: 10px 10px 12px; }
+
+  .macro-cell .macro-name {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .macro-cell .macro-value {
+    font-family: var(--font-mono);
+    font-size: 20px;
+    font-weight: 700;
+    margin-top: 4px;
+  }
+
+  .no-nutrition { font-size: 12px; color: var(--muted); font-style: italic; margin-top: 4px; }
+
+  .error-banner {
+    margin-top: 14px;
+    background: rgba(179, 38, 30, 0.12);
+    border: 1px solid rgba(179, 38, 30, 0.4);
+    color: #F3B8B4;
+    font-size: 13px;
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    display: none;
+  }
+
+  footer {
+    margin-top: 40px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: rgba(250, 246, 236, 0.3);
+    text-align: center;
+    letter-spacing: 0.04em;
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <div class="brand">ByteBite · local inference</div>
+        <h1>Scan a plate.</h1>
+      </div>
+      <div class="tagline">Runs entirely on this machine — no photo ever leaves your device.</div>
+    </header>
+
+    <div class="layout">
+      <div>
+        <div id="scanner" class="scanner" tabindex="0" role="button" aria-label="Upload a food photo">
+          <div id="scannerPrompt">
+            <div class="scanner-icon">📷</div>
+            <div class="scanner-label">Drop a photo, or click to choose</div>
+            <div class="scanner-sub">JPG, PNG, or WEBP</div>
+          </div>
+          <div id="previewWrap" class="preview-wrap">
+            <img id="previewImg" alt="Selected food photo">
+          </div>
+        </div>
+        <input type="file" id="fileInput" accept="image/*">
+
+        <div style="margin-top:14px; display:flex; gap:10px;">
+          <button id="scanBtn" class="btn" disabled>Scan this photo</button>
+          <button id="resetBtn" class="btn btn-ghost" style="display:none;">Choose another</button>
+        </div>
+
+        <div id="errorBanner" class="error-banner"></div>
+      </div>
+
+      <div class="result-slot">
+        <div id="emptyState" class="empty-state">
+          <span class="glyph">Awaiting scan</span>
+          Results appear here once a photo is analyzed — the predicted dish, confidence, and its nutrition facts.
+        </div>
+
+        <div id="labelCard" class="label-card" style="display:none;"></div>
+      </div>
+    </div>
+
+    <footer>ByteBite — offline food recognition &amp; nutrition lookup</footer>
+  </div>
+
+<script>
+  const scanner = document.getElementById('scanner');
+  const fileInput = document.getElementById('fileInput');
+  const scannerPrompt = document.getElementById('scannerPrompt');
+  const previewWrap = document.getElementById('previewWrap');
+  const previewImg = document.getElementById('previewImg');
+  const scanBtn = document.getElementById('scanBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const errorBanner = document.getElementById('errorBanner');
+  const emptyState = document.getElementById('emptyState');
+  const labelCard = document.getElementById('labelCard');
+
+  let selectedFile = null;
+
+  function openPicker() { fileInput.click(); }
+
+  scanner.addEventListener('click', openPicker);
+  scanner.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPicker(); }
+  });
+
+  scanner.addEventListener('dragover', (e) => { e.preventDefault(); scanner.classList.add('hover'); });
+  scanner.addEventListener('dragleave', () => scanner.classList.remove('hover'));
+  scanner.addEventListener('drop', (e) => {
+    e.preventDefault();
+    scanner.classList.remove('hover');
+    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
+
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files.length) handleFile(e.target.files[0]);
+  });
+
+  resetBtn.addEventListener('click', () => {
+    selectedFile = null;
+    fileInput.value = '';
+    scannerPrompt.style.display = 'flex';
+    scannerPrompt.style.flexDirection = 'column';
+    scannerPrompt.style.alignItems = 'center';
+    scannerPrompt.style.gap = '14px';
+    previewWrap.style.display = 'none';
+    resetBtn.style.display = 'none';
+    scanBtn.textContent = 'Scan this photo';
+    scanBtn.disabled = true;
+    hideError();
+    showEmptyState();
+  });
+
+  function handleFile(file) {
+    selectedFile = file;
+    previewImg.src = URL.createObjectURL(file);
+    scannerPrompt.style.display = 'none';
+    previewWrap.style.display = 'flex';
+    resetBtn.style.display = 'inline-block';
+    scanBtn.disabled = false;
+    scanBtn.textContent = 'Scan this photo';
+    hideError();
+  }
+
+  function showEmptyState() {
+    emptyState.style.display = 'block';
+    labelCard.style.display = 'none';
+  }
+
+  function showError(message) {
+    errorBanner.textContent = message;
+    errorBanner.style.display = 'block';
+  }
+
+  function hideError() { errorBanner.style.display = 'none'; }
+
+  function pct(n) { return Math.round(n * 100); }
+
+  function renderResult(data) {
+    const top = data.top_prediction;
+    const alts = data.top_5.slice(1);
+    const nutrition = data.nutrition;
+
+    const altRows = alts.map(p => `
+      <div class="alt-row">
+        <span class="name">${p.label.replace(/_/g, ' ')}</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct(p.confidence)}%"></div></div>
+        <span class="pct">${pct(p.confidence)}%</span>
+      </div>
+    `).join('');
+
+    const nutritionBlock = nutrition ? `
+      <div class="rule-thin"></div>
+      <p class="nutrition-title">Nutrition Facts</p>
+      <p class="serving-line">Per serving — ${nutrition.serving}</p>
+      <div class="calorie-row">
+        <span class="name">Calories</span>
+        <span class="value">${nutrition.calories}</span>
+      </div>
+      <div class="rule-thin"></div>
+      <div class="macro-grid">
+        <div class="macro-cell">
+          <div class="macro-name">Protein</div>
+          <div class="macro-value">${nutrition.protein_g}g</div>
+        </div>
+        <div class="macro-cell">
+          <div class="macro-name">Carbs</div>
+          <div class="macro-value">${nutrition.carbs_g}g</div>
+        </div>
+        <div class="macro-cell">
+          <div class="macro-name">Fat</div>
+          <div class="macro-value">${nutrition.fat_g}g</div>
+        </div>
+      </div>
+    ` : `
+      <div class="rule-thin"></div>
+      <p class="no-nutrition">No nutrition record for this class yet.</p>
+    `;
+
+    labelCard.innerHTML = `
+      <p class="label-title">${top.label.replace(/_/g, ' ')}</p>
+      <p class="label-sub">Best match</p>
+      <div class="rule-thick"></div>
+
+      <div class="match-row">
+        <span class="match-label">Confidence</span>
+        <span class="match-value">${pct(top.confidence)}%</span>
+      </div>
+      <div class="bar-track"><div class="bar-fill" id="topBar" style="width:0%"></div></div>
+
+      <div class="alt-list">${altRows}</div>
+
+      ${nutritionBlock}
+    `;
+
+    labelCard.style.animation = 'none';
+    void labelCard.offsetWidth;
+    labelCard.style.animation = '';
+
+    emptyState.style.display = 'none';
+    labelCard.style.display = 'block';
+
+    requestAnimationFrame(() => {
+      const bar = document.getElementById('topBar');
+      if (bar) bar.style.width = pct(top.confidence) + '%';
+    });
+  }
+
+  scanBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    hideError();
+    scanBtn.disabled = true;
+    scanBtn.textContent = 'Scanning…';
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    try {
+      const res = await fetch('/predict', { method: 'POST', body: formData });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showError(data.error || 'The scan failed. Try a different photo.');
+      } else {
+        renderResult(data);
+      }
+    } catch (err) {
+      showError('Could not reach the server. Confirm the app is running.');
+    } finally {
+      scanBtn.disabled = false;
+      scanBtn.textContent = 'Scan this photo';
+    }
+  });
+</script>
+</body>
+</html>

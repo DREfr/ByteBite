@@ -1,0 +1,44 @@
+{
+  "french_fries": {
+    "serving": "1 medium order (117g)",
+    "calories": 365,
+    "protein_g": 4,
+    "carbs_g": 48,
+    "fat_g": 17
+  },
+  "hamburger": {
+    "serving": "1 burger (150g)",
+    "calories": 295,
+    "protein_g": 17,
+    "carbs_g": 30,
+    "fat_g": 12
+  },
+  "pancakes": {
+    "serving": "3 pancakes w/ syrup (150g)",
+    "calories": 350,
+    "protein_g": 8,
+    "carbs_g": 55,
+    "fat_g": 9
+  },
+  "pizza": {
+    "serving": "1 slice, cheese (107g)",
+    "calories": 285,
+    "protein_g": 12,
+    "carbs_g": 36,
+    "fat_g": 10
+  },
+  "sushi": {
+    "serving": "6 pieces, roll (150g)",
+    "calories": 255,
+    "protein_g": 9,
+    "carbs_g": 38,
+    "fat_g": 7
+  },
+  "tiramisu": {
+    "serving": "1 slice (100g)",
+    "calories": 310,
+    "protein_g": 5,
+    "carbs_g": 33,
+    "fat_g": 17
+  }
+}
