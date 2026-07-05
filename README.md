@@ -122,12 +122,12 @@ Set at container runtime via environment variables (see `app.py`):
 
 | Class | Tested? | Notes |
 |---|---|---|
-| french_fries | ✅ | *(fill in observed accuracy / example results)* |
-| hamburger | ✅ | |
-| pancakes | ✅ | |
-| pizza | ✅ | |
-| sushi | ✅ | |
-| tiramisu | ✅ | |
+| french_fries | ✅ | 91.03% |
+| hamburger | ✅ | 94.45% |
+| pancakes | ✅ | 93.1% |
+| pizza | ✅ | 92.56% |
+| sushi | ✅ | 81.1% |
+| tiramisu | ✅ | 95.1% |
 
 > All six classes have been exercised end-to-end through the running container. Add specific accuracy figures, sample image counts, or misclassification notes here if the course submission requires quantified results.
 
